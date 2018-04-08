@@ -40,9 +40,9 @@ CREATE TABLE [MeterReading] (
 GO
 
 INSERT INTO [Street] (Name) VALUES
-	('ул. Генерала Гуртьева'),
-	('пр. Ленина'),
-	('ул. Аэропортовская')
+	(N'ул. Генерала Гуртьева'),
+	(N'пр. Ленина'),
+	(N'ул. Аэропортовская')
 GO
 
 INSERT INTO [House] (Zip, HouseNumber, StreetId) VALUES

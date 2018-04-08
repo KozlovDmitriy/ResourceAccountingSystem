@@ -19,6 +19,19 @@ namespace ResourceAccountingSystem
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            services.AddCors(options =>
+            {
+                options.AddPolicy("AllowAll",
+                    builder =>
+                    {
+                        builder
+                        .AllowAnyOrigin()
+                        .AllowAnyMethod()
+                        .AllowAnyHeader()
+                        .AllowCredentials();
+                    });
+            });
+
             services.AddMvc();
 
             var connection = @"Server=(localdb)\mssqllocaldb;Database=ResourceAccounting;Trusted_Connection=True;ConnectRetryCount=0";
@@ -32,7 +45,7 @@ namespace ResourceAccountingSystem
             {
                 app.UseDeveloperExceptionPage();
             }
-
+            app.UseCors("AllowAll");
             app.UseMvc();
         }
     }
