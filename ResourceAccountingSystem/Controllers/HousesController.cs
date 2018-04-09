@@ -31,6 +31,42 @@ namespace ResourceAccountingSystem.Controllers
             return Ok(pagesCount);
         }
 
+        // GET: api/Houses/GetMinMaxHouses
+        [HttpGet]
+        [Route("GetMinMaxHouses")]
+        public async Task<IActionResult> GetMinMaxHouses()
+        {
+            var max = await _context.MeterReading
+                .Include(i => i.MeterSerialNumberNavigation.House.Street)
+                .GroupBy(i => i.MeterSerialNumber)
+                .Select(i => i.OrderByDescending(j => j.Value).First())
+                .OrderByDescending(i => i.Value)
+                .Select(i => new {
+                    id = i.MeterSerialNumberNavigation.House.Id,
+                    zip = i.MeterSerialNumberNavigation.House.Zip,
+                    houseNumber = i.MeterSerialNumberNavigation.House.HouseNumber,
+                    street = i.MeterSerialNumberNavigation.House.Street.Name,
+                    meterSerialNumber = i.MeterSerialNumberNavigation.SerialNumber,
+                    meterReadingValue = i.Value
+                })
+                .FirstOrDefaultAsync();
+            var min = await _context.MeterReading
+                .Include(i => i.MeterSerialNumberNavigation.House.Street)
+                .GroupBy(i => i.MeterSerialNumber)
+                .Select(i => i.OrderBy(j => j.Value).First())
+                .OrderBy(i => i.Value)
+                .Select(i => new {
+                    id = i.MeterSerialNumberNavigation.House.Id,
+                    zip = i.MeterSerialNumberNavigation.House.Zip,
+                    houseNumber = i.MeterSerialNumberNavigation.House.HouseNumber,
+                    street = i.MeterSerialNumberNavigation.House.Street.Name,
+                    meterSerialNumber = i.MeterSerialNumberNavigation.SerialNumber,
+                    meterReadingValue = i.Value
+                })
+                .FirstOrDefaultAsync();
+            return Ok(new { max = max, min = min });
+        }
+
         // GET: api/Houses/GetPage?page=1
         [HttpGet]
         [Route("GetPage")]
@@ -53,7 +89,13 @@ namespace ResourceAccountingSystem.Controllers
                     id = i.Id,
                     zip = i.Zip,
                     houseNumber = i.HouseNumber,
-                    street = i.Street.Name
+                    street = i.Street.Name,
+                    meterSerialNumber = i.Meter.FirstOrDefault().SerialNumber,
+                    meterReadingValue = i.Meter.FirstOrDefault()
+                        .MeterReading
+                        .OrderByDescending(j => j.Value)
+                        .Select(j => j.Value)
+                        .FirstOrDefault()
                 })
                 .ToListAsync();
             return Ok(houses);

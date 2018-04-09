@@ -81,33 +81,53 @@ namespace ResourceAccountingSystem.Controllers
             return NoContent();
         }
 
+        public class MeterData
+        {
+            public int houseId;
+            public string serialNumber;
+        }
+
         // POST: api/Meters
         [HttpPost]
-        public async Task<IActionResult> PostMeter([FromBody] Meter meter)
+        public async Task<IActionResult> PostMeter([FromBody] MeterData meterData)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
+            if (meterData == null)
+                return BadRequest($"Invalid arguments");
 
+            var houseId = meterData.houseId;
+            var serialNumber = meterData.serialNumber;
+
+            if (houseId == default(int))
+                return BadRequest($"Field {nameof(houseId)} is required");
+
+            if (String.IsNullOrWhiteSpace(serialNumber))
+                return BadRequest($"Field {nameof(serialNumber)} is required");
+
+            var meterWithSameSnCount = await _context.Meter
+                .CountAsync(i => i.SerialNumber == serialNumber);
+            if (meterWithSameSnCount > 0)
+                return BadRequest($"Meter with the same Serial Number: {serialNumber} is already exists");
+
+            var houseObj = await _context.House.AsNoTracking()
+                .Include(i => i.Meter)
+                .FirstOrDefaultAsync(i => i.Id == houseId);
+            if (houseObj == null)
+            {
+                if (String.IsNullOrWhiteSpace(serialNumber))
+                    return BadRequest($"House with id {houseId} is not exists");
+            }
+            else
+            {
+                var meterFromHouse = houseObj.Meter.FirstOrDefault();
+                if (meterFromHouse != null)
+                {
+                    _context.Meter.Remove(meterFromHouse);
+                }
+            }
+            var meter = new Meter { HouseId = houseId, House = null, SerialNumber = serialNumber };
             _context.Meter.Add(meter);
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateException)
-            {
-                if (MeterExists(meter.SerialNumber))
-                {
-                    return new StatusCodeResult(StatusCodes.Status409Conflict);
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return CreatedAtAction("GetMeter", new { id = meter.SerialNumber }, meter);
+            await _context.SaveChangesAsync();
+            return Ok();
         }
 
         // DELETE: api/Meters/5

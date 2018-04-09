@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ResourceAccountingSystem.Model;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -79,19 +80,63 @@ namespace ResourceAccountingSystem.Controllers
             return NoContent();
         }
 
+        public class ReadingData {
+            public string readingType;
+            public string readingIdentifier;
+            public int readingValue;
+        }
+
         // POST: api/MeterReadings
         [HttpPost]
-        public async Task<IActionResult> PostMeterReading([FromBody] MeterReading meterReading)
+        public async Task<IActionResult> PostMeterReading([FromBody] ReadingData meterReading)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
+            if (meterReading == null)
+                return BadRequest("Invalid arguments");
+
+            if (meterReading.readingValue == default(int))
+                return BadRequest($"Field {nameof(meterReading.readingValue)} is required");
+
+            if (meterReading.readingValue < 0)
+                return BadRequest($"New value must be > 0");
+
+            string meterSn = null;
+            switch (meterReading.readingType) {
+                case "house":
+                    meterSn = await _context.Meter
+                        .Where(i => i.HouseId.ToString() == meterReading.readingIdentifier)
+                        .Select(i => i.SerialNumber)
+                        .FirstOrDefaultAsync();
+                    break;
+                case "meter":
+                    meterSn = await _context.Meter
+                        .Where(i => i.SerialNumber.ToString() == meterReading.readingIdentifier)
+                        .Select(i => i.SerialNumber)
+                        .FirstOrDefaultAsync();
+                    break;
+                default:
+                    return BadRequest($"Invalid argument {meterReading.readingType}");
             }
 
-            _context.MeterReading.Add(meterReading);
-            await _context.SaveChangesAsync();
+            if (String.IsNullOrEmpty(meterSn))
+                return BadRequest("Meter not found");
 
-            return CreatedAtAction("GetMeterReading", new { id = meterReading.Id }, meterReading);
+            var beforeValue = await _context.MeterReading
+                .Where(i => i.MeterSerialNumber == meterSn)
+                .OrderByDescending(i => i.Value)
+                .Select(i => i.Value)
+                .FirstOrDefaultAsync();
+
+            if (beforeValue > meterReading.readingValue)
+                return BadRequest($"New value: {nameof(meterReading.readingValue)} less then before value: {beforeValue}");
+
+            var reading = new MeterReading {
+                MeterSerialNumber = meterSn,
+                ReadingDateTime = DateTime.UtcNow,
+                Value = meterReading.readingValue
+            };
+            await _context.MeterReading.AddAsync(reading);
+            await _context.SaveChangesAsync();
+            return Ok();
         }
 
         // DELETE: api/MeterReadings/5
